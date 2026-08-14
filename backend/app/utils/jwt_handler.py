@@ -1,4 +1,4 @@
-from flask_jwt_extended import create_access_token, create_refresh_token
+from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity
 from datetime import timedelta
 
 
@@ -18,11 +18,11 @@ class JWTHandler:
             dict: Tokens dictionary
         """
         access_token = create_access_token(
-            identity=user_id,
+            identity=str(user_id),
             expires_delta=timedelta(hours=expires_in_hours)
         )
         
-        refresh_token = create_refresh_token(identity=user_id)
+        refresh_token = create_refresh_token(identity=str(user_id))
         
         return {
             'access_token': access_token,
@@ -42,6 +42,22 @@ class JWTHandler:
             str: Access token
         """
         return create_access_token(
-            identity=user_id,
+            identity=str(user_id),
             expires_delta=timedelta(hours=expires_in_hours)
         )
+    
+    @staticmethod
+    def get_current_user_id():
+        """
+        Get the current user ID from JWT token
+        
+        Returns:
+            int: User ID from token
+        """
+        user_id_str = get_jwt_identity()
+        return int(user_id_str) if user_id_str else None
+
+
+def get_current_user_id():
+    """Module-level helper used by route handlers."""
+    return JWTHandler.get_current_user_id()

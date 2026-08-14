@@ -1,73 +1,163 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
-  LayoutDashboard,
-  CheckCircle2,
-  Clock3,
-  Users,
-  TrendingUp,
-  Activity,
-  ArrowUpRight,
+  LayoutDashboard,CheckCircle2,Clock3,Users,TrendingUp,Activity,ArrowUpRight,AlertCircle,MoreVertical,
+  Edit2,
+  Trash2,
 } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
 import DashboardHeader from "../../components/dashboard/DashboardHeader";
 import StatCard from "../../components/dashboard/StatCard";
 import ProjectTable from "../../components/dashboard/ProjectTable";
+import ProjectFormModal from "../../components/dashboard/ProjectFormModal";
+import { projectsAPI } from "../../api/project";
 
 const Dashboard = () => {
-  const [projects, setProjects] = useState([
-    {
-      id: 1,
-      name: "Website Redesign",
-      status: "In Progress",
-      team: 5,
-      deadline: "Dec 15, 2024",
-      progress: 75,
-    },
-    {
-      id: 2,
-      name: "Mobile App",
-      status: "Planning",
-      team: 3,
-      deadline: "Jan 20, 2025",
-      progress: 30,
-    },
-    {
-      id: 3,
-      name: "API Integration",
-      status: "Completed",
-      team: 4,
-      deadline: "Oct 10, 2024",
-      progress: 100,
-    },
-  ]);
+  const [projects, setProjects] = useState([]);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingProjectId, setEditingProjectId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
 
-  const deleteProject = (id) => {
-    setProjects((currentProjects) =>
-      currentProjects.filter((project) => project.id !== id)
-    );
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  const fetchProjects = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await projectsAPI.getAll();
+      const projectsData = response.data || [];
+      setProjects(Array.isArray(projectsData) ? projectsData : []);
+    } catch (err) {
+      console.error("Error fetching projects:", err);
+      setError(err?.message || "Failed to fetch projects");
+      setProjects([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteProject = async (id) => {
+    if (confirm("Are you sure you want to delete this project?")) {
+      try {
+        await projectsAPI.delete(id);
+        setProjects((currentProjects) =>
+          currentProjects.filter((project) => project.id !== id)
+        );
+        setSuccessMessage("Project deleted successfully");
+        setTimeout(() => setSuccessMessage(null), 3000);
+      } catch (err) {
+        setError(err?.message || "Failed to delete project");
+      }
+    }
   };
 
   const handleCreateProject = () => {
-    console.log("Create new project");
+    setIsEditMode(false);
+    setEditingProjectId(null);
+    setIsFormOpen(true);
   };
 
+  const handleEditProject = (project) => {
+    setEditingProjectId(project.id);
+    setIsEditMode(true);
+    setIsFormOpen(true);
+  };
+
+  const handleFormSubmit = async (formData, useFormData = false) => {
+    try {
+      let response;
+
+      if (isEditMode) {
+        response = await projectsAPI.update(editingProjectId, formData, useFormData);
+        const updatedProject = response.data || response;
+        setProjects((prev) =>
+          prev.map((p) => (p.id === editingProjectId ? updatedProject : p))
+        );
+        setSuccessMessage("Project updated successfully");
+      } else {
+        response = await projectsAPI.create(formData, useFormData);
+        const newProject = response.data || response;
+        setProjects((prev) => [...prev, newProject]);
+        setSuccessMessage("Project created successfully");
+      }
+
+      setIsFormOpen(false);
+      setIsEditMode(false);
+      setEditingProjectId(null);
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      throw new Error(err?.message || "Failed to save project");
+    }
+  };
+
+  // Calculate stats
   const totalProjects = projects.length;
   const completedProjects = projects.filter(
-    (project) => project.status === "Completed"
+    (project) => project.status === "closed"
   ).length;
   const inProgressProjects = projects.filter(
-    (project) => project.status === "In Progress"
+    (project) => project.status === "in_progress"
   ).length;
-  const totalTeamMembers = projects.reduce(
-    (total, project) => total + project.team,
-    0
-  );
+  const activeTeamMembers = new Set(
+    projects.flatMap((p) => (p.reporter ? [p.reporter] : []))
+  ).size;
+
+  // Chart data for Project Progress
+  const projectProgressData = [
+    { name: "Completed", value: completedProjects, color: "#c4b5fd" },
+    { name: "In Progress", value: inProgressProjects, color: "#7c3aed" },
+    {
+      name: "Not Started",
+      value: totalProjects - completedProjects - inProgressProjects,
+      color: "#e5e7eb",
+    },
+  ].filter((item) => item.value > 0);
+
+  // Chart data for Task Overview (example data based on projects)
+  const taskOverviewData = [
+    { name: "To Do", value: Math.ceil(totalProjects * 0.5), color: "#d1d5db" },
+    { name: "In Progress", value: Math.ceil(totalProjects * 0.25), color: "#7c3aed" },
+    { name: "In Review", value: 0, color: "#f59e0b" },
+    { name: "Done", value: Math.ceil(totalProjects * 0.25), color: "#10b981" },
+  ].filter((item) => item.value > 0);
+
+  const foundProject = isEditMode
+    ? projects.find((p) => p.id === editingProjectId)
+    : undefined;
 
   return (
     <>
       <DashboardHeader onCreateProject={handleCreateProject} />
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* Error Alert */}
+      {error && (
+        <div className="mb-6 flex gap-3 rounded-lg bg-red-50 p-4 border border-red-200">
+          <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="font-semibold text-red-900">Error</h3>
+            <p className="text-sm text-red-700 mt-0.5">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Success Alert */}
+      {successMessage && (
+        <div className="mb-6 flex gap-3 rounded-lg bg-emerald-50 p-4 border border-emerald-200">
+          <CheckCircle2 className="h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="font-semibold text-emerald-900">Success</h3>
+            <p className="text-sm text-emerald-700 mt-0.5">{successMessage}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Stats Cards - 4 Column Grid */}
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           title="Total Projects"
           value={totalProjects}
@@ -94,132 +184,244 @@ const Dashboard = () => {
 
         <StatCard
           title="Team Members"
-          value={totalTeamMembers}
-          description="Across all projects"
+          value={activeTeamMembers}
+          description="Active team members"
           icon={Users}
           color="violet"
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+      {/* Project Form Modal */}
+      <ProjectFormModal
+        isOpen={isFormOpen}
+        isEditMode={isEditMode}
+        editingProject={foundProject}
+        onClose={() => {
+          setIsFormOpen(false);
+          setIsEditMode(false);
+          setEditingProjectId(null);
+        }}
+        onSubmit={handleFormSubmit}
+      />
+
+      {/* Main Content - Table and Performance */}
+      <div className="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+        {/* Projects Table */}
         <div>
-          <ProjectTable projects={projects} onDelete={deleteProject} />
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Active Projects</h2>
+                <p className="text-sm text-slate-500 mt-1">Track and manage your ongoing projects</p>
+              </div>
+              <a href="#" className="text-sm font-semibold text-indigo-600 hover:text-indigo-700">
+                View All Projects
+              </a>
+            </div>
+            <ProjectTable
+              projects={projects}
+              onDelete={deleteProject}
+              onEdit={handleEditProject}
+              isLoading={loading}
+            />
+          </div>
         </div>
 
-        <div className="space-y-6">
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_12px_40px_-28px_rgba(15,23,42,0.35)]">
-            <div className="mb-5 flex items-center justify-between">
+        {/* Performance Overview Sidebar */}
+        <div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-6 flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-slate-900">Performance</h3>
-                <p className="mt-1 text-xs text-slate-400">
-                  Project completion rate
-                </p>
+                <h3 className="font-bold text-slate-900 text-lg">Performance Overview</h3>
+                <p className="mt-1 text-xs text-slate-400">Project Completion Rate</p>
               </div>
-
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
-                <TrendingUp className="h-4 w-4" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-50">
+                <TrendingUp className="h-5 w-5 text-violet-600" />
               </div>
             </div>
 
-            <div className="flex items-end justify-between">
-              <div>
-                <p className="text-3xl font-bold text-slate-900">78%</p>
-                <div className="mt-1 flex items-center gap-1 text-xs font-medium text-emerald-600">
-                  <ArrowUpRight className="h-3.5 w-3.5" />
-                  12.4%
-                </div>
-              </div>
-
-              <div className="flex h-16 items-end gap-1.5">
-                {[35, 45, 40, 58, 52, 68, 62, 78].map((height, index) => (
-                  <div
-                    key={index}
-                    className="w-2.5 rounded-t-md bg-gradient-to-t from-indigo-500 to-violet-400"
-                    style={{ height: `${height}%` }}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100">
-              <div className="h-full w-[78%] rounded-full bg-gradient-to-r from-indigo-500 to-violet-500" />
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_12px_40px_-28px_rgba(15,23,42,0.35)]">
-            <div className="mb-5 flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-slate-900">Recent Activity</h3>
-                <p className="mt-1 text-xs text-slate-400">
-                  Latest project updates
-                </p>
-              </div>
-
-              <Activity className="h-5 w-5 text-violet-500" />
-            </div>
-
-            <div className="space-y-5">
-              <div className="flex gap-3">
-                <div className="mt-1 h-2 w-2 rounded-full bg-emerald-500" />
-                <div>
-                  <p className="text-xs font-semibold text-slate-700">
-                    API Integration completed
+            {totalProjects > 0 ? (
+              <>
+                <div className="mb-6">
+                  <p className="text-4xl font-bold text-slate-900">
+                    {Math.round((completedProjects / totalProjects) * 100)}%
                   </p>
-                  <p className="mt-1 text-[11px] text-slate-400">2 hours ago</p>
+                  <div className="mt-2 flex items-center gap-1 text-sm font-medium text-emerald-600">
+                    <ArrowUpRight className="h-4 w-4" />
+                    {((completedProjects / totalProjects) * 100).toFixed(1)}% complete
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex gap-3">
-                <div className="mt-1 h-2 w-2 rounded-full bg-indigo-500" />
-                <div>
-                  <p className="text-xs font-semibold text-slate-700">
-                    Website Redesign updated
-                  </p>
-                  <p className="mt-1 text-[11px] text-slate-400">5 hours ago</p>
+                <div className="space-y-3 pt-4 border-t border-slate-100">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-600">On Track</span>
+                    <span className="font-semibold text-slate-900">0</span>
+                    <span className="text-emerald-600 text-xs">0%</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-600">At Risk</span>
+                    <span className="font-semibold text-slate-900">
+                      {inProgressProjects}
+                    </span>
+                    <span className="text-amber-600 text-xs">100%</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-600">Overdue</span>
+                    <span className="font-semibold text-slate-900">0</span>
+                    <span className="text-red-600 text-xs">0%</span>
+                  </div>
                 </div>
-              </div>
-
-              <div className="flex gap-3">
-                <div className="mt-1 h-2 w-2 rounded-full bg-amber-500" />
-                <div>
-                  <p className="text-xs font-semibold text-slate-700">
-                    Mobile App moved to planning
-                  </p>
-                  <p className="mt-1 text-[11px] text-slate-400">Yesterday</p>
-                </div>
-              </div>
-            </div>
-
-            <button className="mt-5 w-full rounded-xl border border-slate-200 py-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
-              View All Activity
-            </button>
+              </>
+            ) : (
+              <p className="text-slate-500 text-sm">Create projects to see performance</p>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-5">
-          <p className="text-xs font-semibold text-indigo-600">PROJECT HEALTH</p>
-          <h3 className="mt-2 text-xl font-bold text-slate-900">Everything looks good</h3>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            Most of your projects are progressing according to schedule.
-          </p>
+      {/* Bottom Charts Section - 3 Columns */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        {/* Project Progress Chart */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-6">
+            <h3 className="font-bold text-slate-900 text-lg">Project Progress</h3>
+            <p className="mt-1 text-xs text-slate-500">Overall progress across all projects</p>
+          </div>
+
+          {projectProgressData.length > 0 ? (
+            <div className="flex justify-center">
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={projectProgressData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={90}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {projectProgressData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="flex h-40 items-center justify-center">
+              <p className="text-slate-400 text-sm">No data available</p>
+            </div>
+          )}
+
+          <div className="mt-6 space-y-3 pt-6 border-t border-slate-100">
+            {projectProgressData.map((item, idx) => (
+              <div key={idx} className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <div
+                    className="h-3 w-3 rounded-full"
+                    style={{ backgroundColor: item.color }}
+                  />
+                  <span className="text-slate-600">{item.name}</span>
+                </div>
+                <span className="font-semibold text-slate-900">{item.value}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 to-white p-5">
-          <p className="text-xs font-semibold text-violet-600">AI INSIGHT</p>
-          <h3 className="mt-2 text-xl font-bold text-slate-900">3 tasks need attention</h3>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            AeroPilot detected tasks that may affect upcoming deadlines.
-          </p>
+        {/* Task Overview Chart */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-6">
+            <h3 className="font-bold text-slate-900 text-lg">Task Overview</h3>
+            <p className="mt-1 text-xs text-slate-500">Task distribution by status</p>
+          </div>
+
+          {taskOverviewData.length > 0 ? (
+            <div className="flex justify-center">
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={taskOverviewData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={90}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {taskOverviewData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="flex h-40 items-center justify-center">
+              <p className="text-slate-400 text-sm">No data available</p>
+            </div>
+          )}
+
+          <div className="mt-6 space-y-3 pt-6 border-t border-slate-100">
+            {taskOverviewData.map((item, idx) => (
+              <div key={idx} className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <div
+                    className="h-3 w-3 rounded-full"
+                    style={{ backgroundColor: item.color }}
+                  />
+                  <span className="text-slate-600">{item.name}</span>
+                </div>
+                <span className="font-semibold text-slate-900">{item.value}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-5">
-          <p className="text-xs font-semibold text-emerald-600">TEAM STATUS</p>
-          <h3 className="mt-2 text-xl font-bold text-slate-900">Team workload is balanced</h3>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            No team member is currently showing critical over-allocation.
-          </p>
+        {/* Recent Activity */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-slate-900 text-lg">Recent Activity</h3>
+              <p className="mt-1 text-xs text-slate-500">Latest updates from your projects</p>
+            </div>
+            <Activity className="h-5 w-5 text-violet-500" />
+          </div>
+
+          {projects.length > 0 ? (
+            <div className="space-y-4">
+              {projects.slice(0, 4).map((project) => (
+                <div key={project.id} className="flex gap-3 pb-4 border-b border-slate-100 last:border-0 last:pb-0">
+                  <div
+                    className={`mt-1 h-3 w-3 rounded-full flex-shrink-0 ${
+                      project.status === "in_progress"
+                        ? "bg-indigo-500"
+                        : project.status === "closed"
+                        ? "bg-emerald-500"
+                        : "bg-amber-500"
+                    }`}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-900 truncate">
+                      {project.summary}
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-400">
+                      {new Date(project.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-slate-500 text-sm">No activity yet</p>
+          )}
+
+          <button className="mt-6 w-full rounded-lg border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+            View All Activity
+          </button>
         </div>
       </div>
     </>

@@ -24,7 +24,8 @@ const AppLayout = ({ user, onLogout }) => {
 
       case "Reports":
         return <Reports />;
-
+      
+      
       default:
         return (
           <div className="rounded-2xl border border-slate-200/80 bg-white p-8 shadow-[0_12px_40px_-28px_rgba(15,23,42,0.35)]">

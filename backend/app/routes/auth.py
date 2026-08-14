@@ -1,16 +1,21 @@
+
+
 from flask import Blueprint, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required
 from app.controllers import AuthController
+from app.utils.jwt_handler import get_current_user_id
 
 auth_bp = Blueprint('auth', __name__)
 
 
 @auth_bp.route('/signup', methods=['POST'])
+@auth_bp.route('/register', methods=['POST'])
 def signup():
     """
     User signup endpoint
     
     POST /api/auth/signup
+    POST /api/auth/register
     {
         "username": "john_doe",
         "email": "john@example.com",
@@ -46,7 +51,7 @@ def refresh():
     POST /api/auth/refresh
     Headers: Authorization: Bearer <refresh_token>
     """
-    current_user_id = get_jwt_identity()
+    current_user_id = get_current_user_id()
     response, status_code = AuthController.refresh(current_user_id)
     return jsonify(response), status_code
 
@@ -60,7 +65,7 @@ def get_me():
     GET /api/auth/me
     Headers: Authorization: Bearer <access_token>
     """
-    current_user_id = get_jwt_identity()
+    current_user_id = get_current_user_id()
     response, status_code = AuthController.get_current_user(current_user_id)
     return jsonify(response), status_code
 
@@ -76,3 +81,4 @@ def logout():
     """
     response, status_code = AuthController.logout()
     return jsonify(response), status_code
+

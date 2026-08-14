@@ -32,7 +32,7 @@ function App() {
         />
 
         {/* Admin Routes - Protected */}
-        <Route
+        <Route 
           path="/admin"
           element={
             auth ? (

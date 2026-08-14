@@ -128,8 +128,8 @@ class AuthService:
         Returns:
             dict: Access and refresh tokens
         """
-        access_token = create_access_token(identity=user_id)
-        refresh_token = create_refresh_token(identity=user_id)
+        access_token = create_access_token(identity=str(user_id))
+        refresh_token = create_refresh_token(identity=str(user_id))
         
         return {
             'access_token': access_token,
@@ -176,6 +176,6 @@ class AuthService:
         if not user or not user.is_active:
             raise ValueError('User not found or inactive')
         
-        access_token = create_access_token(identity=user_id)
+        access_token = create_access_token(identity=str(user_id))
         
         return {'access_token': access_token}

@@ -99,3 +99,5 @@ export const authAPI = {
     return !!localStorage.getItem('access_token');
   },
 };
+
+export default apiClient;
