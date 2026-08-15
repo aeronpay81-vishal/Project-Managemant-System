@@ -1,3 +1,4 @@
+
 import { useState } from 'react'
 import {
   LayoutDashboard,
@@ -10,6 +11,7 @@ import {
   CheckCircle2,
 } from 'lucide-react'
 import { authAPI } from '../api/admin'
+import EmailVerificationOtp from '../components/dashboard/EmailVerificationOtp'
 
 const Login = ({ onLogin }) => {
   const [mode, setMode] = useState('login')
@@ -20,6 +22,8 @@ const Login = ({ onLogin }) => {
   const [isLoading, setIsLoading] = useState(false)
   const [passwordError, setPasswordError] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
+  const [isOtpVerifying, setIsOtpVerifying] = useState(false)
+  const [tempCredentials, setTempCredentials] = useState(null)
 
   const isLogin = mode === 'login'
 
@@ -61,16 +65,27 @@ const Login = ({ onLogin }) => {
     }
 
     setErrorMessage('')
-    setIsLoading(true)
+    // Save credentials and show OTP verification screen
+    setTempCredentials({
+      email,
+      password,
+      name,
+      isLogin,
+    })
+    setIsOtpVerifying(true)
+  }
 
+  const handleOtpVerified = async (otp) => {
+    // After OTP verification, complete the login/signup
+    setIsLoading(true)
     try {
-      const response = isLogin
-        ? await authAPI.login(email, password)
+      const response = tempCredentials.isLogin
+        ? await authAPI.login(tempCredentials.email, tempCredentials.password)
         : await authAPI.register(
-            name.trim().toLowerCase().replace(/\s+/g, '_'),
-            email,
-            password,
-            name,
+            tempCredentials.name.trim().toLowerCase().replace(/\s+/g, '_'),
+            tempCredentials.email,
+            tempCredentials.password,
+            tempCredentials.name,
           )
 
       if (!response || response.success === false) {
@@ -89,6 +104,8 @@ const Login = ({ onLogin }) => {
       setName('')
       setShowPassword(false)
       setPasswordError('')
+      setTempCredentials(null)
+      setIsOtpVerifying(false)
     } catch (error) {
       setErrorMessage(
         error?.message || typeof error === 'string' ? error : 'Network error'
@@ -98,6 +115,12 @@ const Login = ({ onLogin }) => {
     }
   }
 
+  const handleOtpBack = () => {
+    setIsOtpVerifying(false)
+    setTempCredentials(null)
+    setErrorMessage('')
+  }
+
   const switchMode = () => {
     setMode(isLogin ? 'signup' : 'login')
     setEmail('')
@@ -105,10 +128,13 @@ const Login = ({ onLogin }) => {
     setName('')
     setShowPassword(false)
     setPasswordError('')
+    setErrorMessage('')
+    setIsOtpVerifying(false)
+    setTempCredentials(null)
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#030712] text-white">
+    <div className="relative min-h-screen overflow-hidden bg-[#f7f7fb] text-slate-900">
 
       {/* ================= BACKGROUND ================= */}
 
@@ -122,7 +148,7 @@ const Login = ({ onLogin }) => {
             h-[420px]
             w-[420px]
             rounded-full
-            bg-violet-600/[0.10]
+            bg-violet-400/[0.18]
             blur-[120px]
           "
         />
@@ -135,7 +161,7 @@ const Login = ({ onLogin }) => {
             h-[450px]
             w-[450px]
             rounded-full
-            bg-indigo-600/[0.08]
+            bg-indigo-400/[0.16]
             blur-[130px]
           "
         />
@@ -148,7 +174,7 @@ const Login = ({ onLogin }) => {
             h-[500px]
             w-[500px]
             rounded-full
-            bg-purple-600/[0.06]
+            bg-purple-400/[0.14]
             blur-[140px]
           "
         />
@@ -169,9 +195,9 @@ const Login = ({ onLogin }) => {
               overflow-hidden
               rounded-[28px]
               border
-              border-white/[0.07]
-              bg-[#070c19]/95
-              shadow-[0_35px_100px_-45px_rgba(0,0,0,0.95)]
+              border-slate-200
+              bg-white/95
+              shadow-[0_35px_100px_-45px_rgba(0,0,0,0.25)]
               backdrop-blur-xl
               lg:grid-cols-[1.1fr_0.9fr]
             "
@@ -192,14 +218,14 @@ const Login = ({ onLogin }) => {
                   gap-2
                   rounded-full
                   border
-                  border-indigo-400/20
-                  bg-indigo-500/[0.07]
+                  border-indigo-300/40
+                  bg-indigo-50
                   px-3
                   py-1.5
                 "
               >
 
-                <Sparkles className="h-3.5 w-3.5 text-indigo-300" />
+                <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
 
                 <span
                   className="
@@ -207,7 +233,7 @@ const Login = ({ onLogin }) => {
                     font-semibold
                     uppercase
                     tracking-[0.25em]
-                    text-[#fff]
+                    text-indigo-700
                   "
                 >
                   PMS Workspace
@@ -231,10 +257,9 @@ const Login = ({ onLogin }) => {
                 <span
                   className="
                     bg-gradient-to-r
-                    from-indigo-300
-                    via-violet-300
-                    to-white-400
-                    to-purple-300
+                    from-indigo-600
+                    via-violet-600
+                    to-purple-600
                     bg-clip-text
                     text-transparent
                   "
@@ -246,9 +271,9 @@ const Login = ({ onLogin }) => {
                 <span
                   className="
                     bg-gradient-to-r
-                    from-indigo-300
-                    via-violet-300
-                    to-purple-300
+                    from-indigo-600
+                    via-violet-600
+                    to-purple-600
                     bg-clip-text
                     text-transparent
                   "
@@ -265,7 +290,7 @@ const Login = ({ onLogin }) => {
                   max-w-[500px]
                   text-sm
                   leading-6
-                  text-slate-400
+                  text-slate-600
                 "
               >
                 Log in quickly, stay secure, and access your dashboard
@@ -280,8 +305,8 @@ const Login = ({ onLogin }) => {
                   className="
                     rounded-xl
                     border
-                    border-white/[0.07]
-                    bg-white/[0.018]
+                    border-slate-200
+                    bg-slate-50
                     px-4
                     py-3
                   "
@@ -292,7 +317,7 @@ const Login = ({ onLogin }) => {
                       text-[9px]
                       uppercase
                       tracking-[0.2em]
-                      text-slate-600
+                      text-slate-500
                     "
                   >
                     Fast access
@@ -300,9 +325,9 @@ const Login = ({ onLogin }) => {
 
                   <div className="mt-2 flex items-center gap-2">
 
-                    <CheckCircle2 className="h-4 w-4 text-indigo-400" />
+                    <CheckCircle2 className="h-4 w-4 text-indigo-500" />
 
-                    <span className="text-sm font-medium text-slate-200">
+                    <span className="text-sm font-medium text-slate-800">
                       Instant sign in
                     </span>
 
@@ -314,8 +339,8 @@ const Login = ({ onLogin }) => {
                   className="
                     rounded-xl
                     border
-                    border-white/[0.07]
-                    bg-white/[0.018]
+                    border-slate-200
+                    bg-slate-50
                     px-4
                     py-3
                   "
@@ -326,7 +351,7 @@ const Login = ({ onLogin }) => {
                       text-[9px]
                       uppercase
                       tracking-[0.2em]
-                      text-slate-600
+                      text-slate-500
                     "
                   >
                     Safe login
@@ -334,9 +359,9 @@ const Login = ({ onLogin }) => {
 
                   <div className="mt-2 flex items-center gap-2">
 
-                    <CheckCircle2 className="h-4 w-4 text-violet-400" />
+                    <CheckCircle2 className="h-4 w-4 text-violet-500" />
 
-                    <span className="text-sm font-medium text-slate-200">
+                    <span className="text-sm font-medium text-slate-800">
                       Secure connection
                     </span>
 
@@ -356,8 +381,8 @@ const Login = ({ onLogin }) => {
                   gap-3
                   rounded-xl
                   border
-                  border-white/[0.06]
-                  bg-white/[0.018]
+                  border-slate-200
+                  bg-slate-50
                   px-4
                   py-3
                 "
@@ -372,11 +397,11 @@ const Login = ({ onLogin }) => {
                     items-center
                     justify-center
                     rounded-lg
-                    bg-indigo-500/[0.08]
+                    bg-indigo-100
                   "
                 >
 
-                  <ShieldCheck className="h-4 w-4 text-indigo-300" />
+                  <ShieldCheck className="h-4 w-4 text-indigo-600" />
 
                 </div>
 
@@ -396,7 +421,7 @@ const Login = ({ onLogin }) => {
             <div
               className="
                 border-t
-                border-white/[0.06]
+                border-slate-200
                 p-7
                 sm:p-9
                 lg:border-l
@@ -416,7 +441,7 @@ const Login = ({ onLogin }) => {
                       text-[9px]
                       uppercase
                       tracking-[0.28em]
-                      text-indigo-300
+                      text-indigo-600
                     "
                   >
                     Secure access
@@ -428,6 +453,7 @@ const Login = ({ onLogin }) => {
                       text-[29px]
                       font-semibold
                       tracking-[-0.03em]
+                      text-slate-900
                     "
                   >
                     {isLogin
@@ -464,6 +490,7 @@ const Login = ({ onLogin }) => {
                     to-violet-500
                     shadow-lg
                     shadow-indigo-500/20
+                    text-white
                   "
                 >
                   <LayoutDashboard className="h-5 w-5" />
@@ -471,12 +498,21 @@ const Login = ({ onLogin }) => {
 
               </div>
 
-              {/* ================= FORM ================= */}
+              {/* ================= OTP OR FORM ================= */}
 
-              <form
-                onSubmit={handleSubmit}
-                className="mt-8"
-              >
+              {isOtpVerifying && tempCredentials ? (
+                <EmailVerificationOtp
+                  email={tempCredentials.email}
+                  purpose={tempCredentials.isLogin ? 'login' : 'signup'}
+                  onVerified={handleOtpVerified}
+                  onBack={handleOtpBack}
+                />
+              ) : (
+                <>
+                <form
+                  onSubmit={handleSubmit}
+                  className="mt-8"
+                >
 
                 {/* NAME */}
 
@@ -489,7 +525,7 @@ const Login = ({ onLogin }) => {
                         block
                         text-[11px]
                         font-medium
-                        text-slate-300
+                        text-slate-600
                       "
                     >
                       Full Name
@@ -506,7 +542,7 @@ const Login = ({ onLogin }) => {
                           h-4
                           w-4
                           -translate-y-1/2
-                          text-slate-600
+                          text-slate-400
                         "
                       />
 
@@ -522,20 +558,20 @@ const Login = ({ onLogin }) => {
                           w-full
                           rounded-xl
                           border
-                          border-white/[0.09]
-                          bg-[#0d1426]
+                          border-slate-200
+                          bg-white
                           px-4
                           pl-10
                           text-[13px]
-                          text-white
+                          text-slate-900
                           outline-none
                           transition
-                          placeholder:text-slate-600
-                          hover:border-white/[0.14]
-                          focus:border-indigo-500/60
-                          focus:bg-[#10182c]
+                          placeholder:text-slate-400
+                          hover:border-slate-300
+                          focus:border-indigo-500
+                          focus:bg-white
                           focus:ring-4
-                          focus:ring-indigo-500/[0.05]
+                          focus:ring-indigo-500/[0.10]
                         "
                       />
 
@@ -554,7 +590,7 @@ const Login = ({ onLogin }) => {
                       block
                       text-[11px]
                       font-medium
-                      text-slate-300
+                      text-slate-600
                     "
                   >
                     Email Address
@@ -572,19 +608,19 @@ const Login = ({ onLogin }) => {
                       w-full
                       rounded-xl
                       border
-                      border-white/[0.09]
-                      bg-[#0d1426]
+                      border-slate-200
+                      bg-white
                       px-4
                       text-[13px]
-                      text-white
+                      text-slate-900
                       outline-none
                       transition
-                      placeholder:text-slate-600
-                      hover:border-white/[0.14]
-                      focus:border-indigo-500/60
-                      focus:bg-[#10182c]
+                      placeholder:text-slate-400
+                      hover:border-slate-300
+                      focus:border-indigo-500
+                      focus:bg-white
                       focus:ring-4
-                      focus:ring-indigo-500/[0.05]
+                      focus:ring-indigo-500/[0.10]
                     "
                   />
 
@@ -600,7 +636,7 @@ const Login = ({ onLogin }) => {
                       className="
                         text-[11px]
                         font-medium
-                        text-slate-300
+                        text-slate-600
                       "
                     >
                       Password
@@ -612,8 +648,8 @@ const Login = ({ onLogin }) => {
                         className="
                           text-[10px]
                           font-medium
-                          text-indigo-300
-                          hover:text-indigo-200
+                          text-indigo-600
+                          hover:text-indigo-700
                         "
                       >
                         Forgot password?
@@ -640,24 +676,24 @@ const Login = ({ onLogin }) => {
                         w-full
                         rounded-xl
                         border
-                        bg-[#0d1426]
+                        bg-white
                         px-4
                         pr-11
                         text-[13px]
-                        text-white
+                        text-slate-900
                         outline-none
                         transition
-                        placeholder:text-slate-600
-                        hover:border-white/[0.14]
-                        focus:bg-[#10182c]
+                        placeholder:text-slate-400
+                        hover:border-slate-300
+                        focus:bg-white
                         focus:ring-4
-                        focus:ring-indigo-500/[0.05]
+                        focus:ring-indigo-500/[0.10]
                         ${
                           passwordError
-                            ? 'border-red-500/50 focus:border-red-500/60'
+                            ? 'border-red-400 focus:border-red-500'
                             : password.length > 0
-                            ? 'border-green-500/50 focus:border-green-500/60'
-                            : 'border-white/[0.09]'
+                            ? 'border-green-400 focus:border-green-500'
+                            : 'border-slate-200'
                         }
                       `}
                     />
@@ -678,10 +714,10 @@ const Login = ({ onLogin }) => {
                         items-center
                         justify-center
                         rounded-lg
-                        text-slate-500
+                        text-slate-400
                         transition
-                        hover:bg-white/[0.05]
-                        hover:text-white
+                        hover:bg-slate-100
+                        hover:text-slate-700
                       "
                       aria-label={
                         showPassword
@@ -700,21 +736,21 @@ const Login = ({ onLogin }) => {
 
                   {/* Password Error Message */}
                   {passwordError && (
-                    <p className="mt-1.5 text-xs text-red-400">
+                    <p className="mt-1.5 text-xs text-red-500">
                       {passwordError}
                     </p>
                   )}
 
                   {/* API Error Message */}
                   {errorMessage && (
-                    <p className="mt-1.5 text-xs text-red-400">
+                    <p className="mt-1.5 text-xs text-red-500">
                       {errorMessage}
                     </p>
                   )}
 
                   {/* Password Strength Indicator */}
                   {!errorMessage && password.length > 0 && !passwordError && (
-                    <p className="mt-1.5 text-xs text-green-400">
+                    <p className="mt-1.5 text-xs text-green-600">
                       ✓ Password is valid
                     </p>
                   )}
@@ -744,11 +780,11 @@ const Login = ({ onLogin }) => {
                     text-[13px]
                     font-semibold
                     text-white
-                    shadow-[0_8px_25px_-8px_rgba(99,102,241,0.7)]
+                    shadow-[0_8px_25px_-8px_rgba(99,102,241,0.5)]
                     transition-all
                     duration-200
                     hover:-translate-y-[1px]
-                    hover:shadow-[0_12px_30px_-8px_rgba(99,102,241,0.8)]
+                    hover:shadow-[0_12px_30px_-8px_rgba(99,102,241,0.6)]
                     active:translate-y-0
                     disabled:cursor-not-allowed
                     disabled:opacity-60
@@ -793,20 +829,20 @@ const Login = ({ onLogin }) => {
 
               <div className="my-6 flex items-center gap-3">
 
-                <div className="h-px flex-1 bg-white/[0.07]" />
+                <div className="h-px flex-1 bg-slate-200" />
 
                 <span
                   className="
                     text-[9px]
                     uppercase
                     tracking-[0.15em]
-                    text-slate-600
+                    text-slate-400
                   "
                 >
                   or continue with
                 </span>
 
-                <div className="h-px flex-1 bg-white/[0.07]" />
+                <div className="h-px flex-1 bg-slate-200" />
 
               </div>
 
@@ -824,14 +860,14 @@ const Login = ({ onLogin }) => {
                     gap-2
                     rounded-xl
                     border
-                    border-white/[0.08]
-                    bg-white/[0.018]
+                    border-slate-200
+                    bg-white
                     text-[11px]
                     font-medium
-                    text-slate-300
+                    text-slate-700
                     transition
-                    hover:border-white/[0.14]
-                    hover:bg-white/[0.04]
+                    hover:border-slate-300
+                    hover:bg-slate-50
                   "
                 >
 
@@ -874,14 +910,14 @@ const Login = ({ onLogin }) => {
                     gap-2
                     rounded-xl
                     border
-                    border-white/[0.08]
-                    bg-white/[0.018]
+                    border-slate-200
+                    bg-white
                     text-[11px]
                     font-medium
-                    text-slate-300
+                    text-slate-700
                     transition
-                    hover:border-white/[0.14]
-                    hover:bg-white/[0.04]
+                    hover:border-slate-300
+                    hover:bg-slate-50
                   "
                 >
 
@@ -906,7 +942,7 @@ const Login = ({ onLogin }) => {
                   mt-6
                   text-center
                   text-xs
-                  text-slate-600
+                  text-slate-500
                 "
               >
 
@@ -921,9 +957,9 @@ const Login = ({ onLogin }) => {
                   onClick={switchMode}
                   className="
                     font-semibold
-                    text-indigo-300
+                    text-indigo-600
                     transition
-                    hover:text-indigo-200
+                    hover:text-indigo-700
                   "
                 >
                   {isLogin
@@ -942,21 +978,23 @@ const Login = ({ onLogin }) => {
                     text-center
                     text-[9px]
                     leading-4
-                    text-slate-700
+                    text-slate-400
                   "
                 >
                   By creating an account, you agree to our{' '}
 
-                  <span className="text-indigo-300/70">
+                  <span className="text-indigo-600/80">
                     Terms of Service
                   </span>{' '}
 
                   and{' '}
 
-                  <span className="text-indigo-300/70">
+                  <span className="text-indigo-600/80">
                     Privacy Policy
                   </span>.
                 </p>
+              )}
+              </>
               )}
 
             </div>
@@ -965,7 +1003,7 @@ const Login = ({ onLogin }) => {
 
           {/* Footer */}
 
-          <p className="mt-5 text-center text-[9px] text-[#fff]">
+          <p className="mt-5 text-center text-[9px] text-slate-500">
             © 2026 AeroPilot Project Management. All rights reserved.
           </p>
 

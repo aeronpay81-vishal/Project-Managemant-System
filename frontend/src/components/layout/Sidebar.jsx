@@ -79,6 +79,39 @@ const Sidebar = ({ activeItem = "Dashboard", onNavigate, mobileOpen, onClose }) 
 
   return (
     <>
+      {/* Custom Scrollbar Styles */}
+      <style>{`
+        .sidebar-scroll::-webkit-scrollbar {
+          width: 8px;
+        }
+
+        .sidebar-scroll::-webkit-scrollbar-track {
+          background: transparent;
+          margin: 8px 0;
+        }
+
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+          background: linear-gradient(180deg, #a855f7 0%, #6366f1 100%);
+          border-radius: 4px;
+          border: 2px solid transparent;
+          background-clip: padding-box;
+          transition: all 0.3s ease;
+        }
+
+        .sidebar-scroll::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(180deg, #c084fc 0%, #818cf8 100%);
+          border-radius: 4px;
+          border: 2px solid transparent;
+          background-clip: padding-box;
+        }
+
+        /* Firefox scrollbar */
+        .sidebar-scroll {
+          scrollbar-color: #a855f7 transparent;
+          scrollbar-width: thin;
+        }
+      `}</style>
+
       {/* Mobile overlay */}
       {mobileOpen && (
         <div
@@ -129,8 +162,8 @@ const Sidebar = ({ activeItem = "Dashboard", onNavigate, mobileOpen, onClose }) 
           </button>
         </div>
 
-        {/* Navigation */}
-        <div className="flex-1 overflow-y-auto px-3 py-5">
+        {/* Navigation - with custom scrollbar */}
+        <div className="sidebar-scroll flex-1 overflow-y-auto px-3 py-5">
           {!collapsed && (
             <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
               Workspace

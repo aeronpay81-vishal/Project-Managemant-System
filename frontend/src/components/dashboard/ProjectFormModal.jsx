@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   X,
   Upload,
@@ -31,6 +31,11 @@ const ProjectFormModal = ({ isOpen, isEditMode, editingProject, onClose, onSubmi
   const [labelInput, setLabelInput] = useState("");
   const [error, setError] = useState("");
   const [existingAttachment, setExistingAttachment] = useState(null);
+  const [showSummaryLimitPopup, setShowSummaryLimitPopup] = useState(false);
+
+  const popupTimeoutRef = useRef(null);
+
+  const MAX_SUMMARY_LENGTH = 255;
 
   // Helper function to safely parse dates
   const formatDateForInput = (dateString) => {
@@ -104,8 +109,39 @@ const ProjectFormModal = ({ isOpen, isEditMode, editingProject, onClose, onSubmi
     setError("");
   }, [isEditMode, editingProject, isOpen]);
 
+  // Clean up popup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (popupTimeoutRef.current) {
+        clearTimeout(popupTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const triggerSummaryLimitPopup = () => {
+    setShowSummaryLimitPopup(true);
+    if (popupTimeoutRef.current) {
+      clearTimeout(popupTimeoutRef.current);
+    }
+    popupTimeoutRef.current = setTimeout(() => {
+      setShowSummaryLimitPopup(false);
+    }, 3000);
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    // Explicit length validation for the summary field (covers paste too,
+    // not just typing, since maxLength alone can be bypassed in some cases)
+    if (name === "summary" && value.length > MAX_SUMMARY_LENGTH) {
+      triggerSummaryLimitPopup();
+      setFormData((prev) => ({
+        ...prev,
+        summary: value.slice(0, MAX_SUMMARY_LENGTH),
+      }));
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
       [name]: value,
@@ -168,6 +204,12 @@ const ProjectFormModal = ({ isOpen, isEditMode, editingProject, onClose, onSubmi
     // Validation
     if (!formData.summary.trim()) {
       setError("Project name/summary is required");
+      return;
+    }
+
+    if (formData.summary.trim().length > MAX_SUMMARY_LENGTH) {
+      triggerSummaryLimitPopup();
+      setError(`Project name cannot exceed ${MAX_SUMMARY_LENGTH} characters`);
       return;
     }
 
@@ -289,20 +331,47 @@ const ProjectFormModal = ({ isOpen, isEditMode, editingProject, onClose, onSubmi
               <label className="block text-sm font-semibold text-slate-700 mb-2">
                 Project Name *
                 <span className="text-xs text-slate-500 font-normal ml-1">
-                  (Required - max 255 characters)
+                  (Required - max {MAX_SUMMARY_LENGTH} characters)
                 </span>
               </label>
-              <input
-                type="text"
-                name="summary"
-                value={formData.summary}
-                onChange={handleChange}
-                placeholder="e.g., Website Redesign, Mobile App v2"
-                maxLength={255}
-                className="w-full px-4 py-3 rounded-lg border border-slate-300 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
-              />
-              <p className="text-xs text-slate-500 mt-1">
-                {formData.summary.length}/255 characters
+
+              <div className="relative">
+                {/* Popup message shown when the limit is exceeded */}
+                {showSummaryLimitPopup && (
+                  <div
+                    role="alert"
+                    className="absolute bottom-full left-0 mb-2 z-10 flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-xs font-medium text-white shadow-lg"
+                  >
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                    <span>
+                      Project name can't be more than {MAX_SUMMARY_LENGTH} characters
+                    </span>
+                    <span className="absolute top-full left-6 h-2 w-2 rotate-45 bg-red-600" />
+                  </div>
+                )}
+
+                <input
+                  type="text"
+                  name="summary"
+                  value={formData.summary}
+                  onChange={handleChange}
+                  placeholder="e.g., Website Redesign, Mobile App v2"
+                  className={`w-full px-4 py-3 rounded-lg border text-slate-900 placeholder-slate-400 focus:ring-2 transition-all ${
+                    showSummaryLimitPopup
+                      ? "border-red-400 focus:border-red-500 focus:ring-red-200"
+                      : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-200"
+                  }`}
+                />
+              </div>
+
+              <p
+                className={`text-xs mt-1 ${
+                  formData.summary.length >= MAX_SUMMARY_LENGTH
+                    ? "text-red-600 font-semibold"
+                    : "text-slate-500"
+                }`}
+              >
+                {formData.summary.length}/{MAX_SUMMARY_LENGTH} characters
               </p>
             </div>
 

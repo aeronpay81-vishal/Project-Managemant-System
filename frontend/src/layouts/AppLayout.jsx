@@ -5,6 +5,7 @@ import Topbar from "../components/layout/Topbar";
 import Dashboard from "../modules/Dashboard";
 import Projects from "../modules/Projects";
 import Team from "../modules/Team";
+import SmartTime from "../modules/SmartTime";
 import Reports from "../modules/Reports";
 
 const AppLayout = ({ user, onLogout }) => {
@@ -15,6 +16,8 @@ const AppLayout = ({ user, onLogout }) => {
     switch (activeItem) {
       case "Dashboard":
         return <Dashboard />;
+      case "Smart Timeline":
+        return <SmartTime />;  
 
       case "Projects":
         return <Projects />;
