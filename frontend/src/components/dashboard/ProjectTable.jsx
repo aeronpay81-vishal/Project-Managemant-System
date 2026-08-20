@@ -1,39 +1,45 @@
-import {
-  Calendar,
-  Edit2,
-  Trash2,
-  MoreHorizontal,
-  Loader,
-} from "lucide-react";
+import { Calendar, Edit2, Trash2, MoreHorizontal, Loader2, Inbox } from "lucide-react";
+import { authAPI } from "../../api/admin";
 
-const ProjectTable = ({ projects, onDelete, onEdit, isLoading }) => {
-  const statusStyles = {
-    closed: "bg-emerald-50 text-emerald-700 border-emerald-100",
-    in_progress: "bg-amber-50 text-amber-700 border-amber-100",
-    open: "bg-indigo-50 text-indigo-700 border-indigo-100",
-    review: "bg-blue-50 text-blue-700 border-blue-100",
-    cancelled: "bg-red-50 text-red-700 border-red-100",
-    active: "bg-indigo-50 text-indigo-700 border-indigo-100",
-    on_hold: "bg-slate-50 text-slate-700 border-slate-100",
-    completed: "bg-emerald-50 text-emerald-700 border-emerald-100",
-  };
+const STATUS_META = {
+  open: { label: "Open", classes: "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-900/40" },
+  active: { label: "Active", classes: "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-900/40" },
+  in_progress: { label: "In progress", classes: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/40" },
+  review: { label: "In review", classes: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/40" },
+  on_hold: { label: "On hold", classes: "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/60 dark:text-slate-400 dark:border-slate-700" },
+  closed: { label: "Closed", classes: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/40" },
+  completed: { label: "Completed", classes: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/40" },
+  cancelled: { label: "Cancelled", classes: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/40" },
+};
 
-  const getStatusLabel = (status) => {
-    const labels = {
-      closed: "Closed",
-      in_progress: "In Progress",
-      open: "Open",
-      review: "Review",
-      cancelled: "Cancelled",
-      active: "Active",
-      on_hold: "On Hold",
-      completed: "Completed",
-    };
-    return labels[status] || status;
-  };
+const PRIORITY_META = {
+  low: { label: "Low", dot: "bg-slate-400" },
+  medium: { label: "Medium", dot: "bg-blue-500" },
+  high: { label: "High", dot: "bg-amber-500" },
+  critical: { label: "Critical", dot: "bg-red-500" },
+};
+
+const AVATAR_PALETTE = [
+  "bg-indigo-600",
+  "bg-violet-600",
+  "bg-teal-600",
+  "bg-rose-600",
+  "bg-amber-600",
+];
+
+const avatarColor = (seed) => {
+  const str = String(seed || "");
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
+};
+
+const ProjectTable = ({ projects, onDelete, onEdit, isLoading, user }) => {
+  const currentUser = user || authAPI.getStoredUser() || {};
+  const isManager = currentUser?.role === "manager";
 
   const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
+    if (!dateString) return "No date";
     try {
       return new Date(dateString).toLocaleDateString("en-US", {
         year: "numeric",
@@ -43,26 +49,6 @@ const ProjectTable = ({ projects, onDelete, onEdit, isLoading }) => {
     } catch {
       return dateString;
     }
-  };
-
-  const getPriorityColor = (priority) => {
-    const colors = {
-      low: "text-blue-600",
-      medium: "text-yellow-600",
-      high: "text-orange-600",
-      critical: "text-red-600",
-    };
-    return colors[priority] || "text-slate-600";
-  };
-
-  const getPriorityEmoji = (priority) => {
-    const emojis = {
-      low: "🟢",
-      medium: "🟡",
-      high: "🟠",
-      critical: "🔴",
-    };
-    return emojis[priority] || "◯";
   };
 
   // Normalizes labels to an array of strings regardless of whether
@@ -76,119 +62,112 @@ const ProjectTable = ({ projects, onDelete, onEdit, isLoading }) => {
       .filter(Boolean);
   };
 
+  const headerCopy = {
+    title: isManager ? "Active projects" : "My assigned projects",
+    subtitle: isManager
+      ? "Manage your current projects and track progress."
+      : "Projects assigned to you by your project manager.",
+  };
+
+  const Shell = ({ children }) => (
+    <section className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+      <div className="flex flex-col gap-3 border-b border-slate-100 dark:border-slate-800 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{headerCopy.title}</h3>
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+            {headerCopy.subtitle}
+            {projects.length > 0 && ` (${projects.length} ${projects.length === 1 ? "project" : "projects"})`}
+          </p>
+        </div>
+        {projects.length > 0 && (
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 self-start rounded-md border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
+            View all
+            <MoreHorizontal className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      {children}
+    </section>
+  );
+
   // Loading State
   if (isLoading) {
     return (
-      <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_12px_40px_-28px_rgba(15,23,42,0.35)]">
-        <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div>
-            <h3 className="text-lg font-bold text-slate-900">Active Projects</h3>
-            <p className="mt-0.5 text-xs text-slate-500">
-              Manage your current projects and track progress.
-            </p>
-          </div>
+      <Shell>
+        <div className="flex flex-col items-center justify-center px-6 py-14">
+          <Loader2 className="h-5 w-5 text-slate-400 animate-spin" />
+          {/* <p className="text-sm text-slate-500 dark:text-slate-400 mt-3">Loading projects...</p> */}
         </div>
-
-        <div className="flex flex-col items-center justify-center px-6 py-12">
-          <Loader className="h-8 w-8 text-indigo-600 animate-spin" />
-          <p className="text-slate-600 font-medium mt-4">Loading projects...</p>
-        </div>
-      </section>
+      </Shell>
     );
   }
 
   // Empty State
   if (projects.length === 0) {
     return (
-      <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_12px_40px_-28px_rgba(15,23,42,0.35)]">
-        <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div>
-            <h3 className="text-lg font-bold text-slate-900">Active Projects</h3>
-            <p className="mt-0.5 text-xs text-slate-500">
-              Manage your current projects and track progress.
-            </p>
+      <Shell>
+        <div className="flex flex-col items-center justify-center px-6 py-14">
+          <div className="rounded-full bg-slate-100 dark:bg-slate-800 p-3 mb-3">
+            <Inbox className="h-5 w-5 text-slate-400 dark:text-slate-500" />
           </div>
-        </div>
-
-        <div className="flex flex-col items-center justify-center px-6 py-12">
-          <div className="rounded-full bg-slate-100 p-3 mb-3">
-            <MoreHorizontal className="h-6 w-6 text-slate-400" />
-          </div>
-          <p className="text-slate-600 font-medium">No projects yet</p>
-          <p className="text-slate-500 text-sm mt-1">
-            Create your first project to get started
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">No projects yet</p>
+          <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
+            {isManager ? "Create your first project to get started." : "No projects have been assigned to you yet."}
           </p>
         </div>
-      </section>
+      </Shell>
     );
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_12px_40px_-28px_rgba(15,23,42,0.35)]">
-      {/* Header */}
-      <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <div>
-          <h3 className="text-lg font-bold text-slate-900">Active Projects</h3>
-          <p className="mt-0.5 text-xs text-slate-500">
-            Manage your current projects and track progress. ({projects.length}{" "}
-            {projects.length === 1 ? "project" : "projects"})
-          </p>
-        </div>
-
-        <button className="inline-flex items-center gap-2 self-start rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
-          View All
-          <MoreHorizontal className="h-4 w-4" />
-        </button>
-      </div>
-
-      {/* Table */}
+    <Shell>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[760px]">
+        <table className="w-full min-w-[860px]">
           <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/70">
-              <th className="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30">
+              <th className="px-5 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
                 Project
               </th>
-
-              <th className="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              <th className="px-5 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
                 Status
               </th>
-
-              <th className="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              <th className="px-5 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
                 Priority
               </th>
-
-              <th className="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Labels
+              <th className="px-5 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                Assignee
               </th>
-
-              <th className="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Due Date
+              <th className="px-5 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                Due date
               </th>
-
-              <th className="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              <th className="px-5 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
                 Reporter
               </th>
-
-              <th className="px-6 py-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              <th className="px-5 py-2.5 text-right text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
                 Actions
               </th>
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {projects.map((project) => {
               const labelsArray = getLabelsArray(project.labels);
+              const assigneeName = project.assignee ? project.assignee.full_name || project.assignee.username : null;
+              const status = STATUS_META[project.status] || {
+                label: project.status || "Unknown",
+                classes: "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800/60 dark:text-slate-400 dark:border-slate-700",
+              };
+              const priority = PRIORITY_META[project.priority] || PRIORITY_META.medium;
 
               return (
-                <tr
-                  key={project.id}
-                  className="group transition hover:bg-slate-50/70"
-                >
+                <tr key={project.id} className="group transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/20">
                   {/* Project */}
-                  <td className="px-6 py-4">
+                  <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-50 to-violet-50 text-xs font-bold text-indigo-600">
+                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-slate-100 dark:bg-slate-800 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
                         {(project.summary || "P")
                           .split(" ")
                           .map((word) => word[0])
@@ -197,92 +176,107 @@ const ProjectTable = ({ projects, onDelete, onEdit, isLoading }) => {
                           .toUpperCase()}
                       </div>
 
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate max-w-[220px]">
                           {project.summary}
                         </p>
-
-                        <p className="mt-0.5 text-[11px] text-slate-400">
-                          ID: {project.id}
-                        </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[11px] text-slate-400 dark:text-slate-500">#{project.id}</span>
+                          {labelsArray.length > 0 && (
+                            <span className="text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded">
+                              {labelsArray[0]}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </td>
 
                   {/* Status */}
-                  <td className="px-6 py-4">
-                    <span
-                      className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-                        statusStyles[project.status] ||
-                        "border-slate-100 bg-slate-50 text-slate-600"
-                      }`}
-                    >
-                      {getStatusLabel(project.status)}
+                  <td className="px-5 py-3.5">
+                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium ${status.classes}`}>
+                      {status.label}
                     </span>
                   </td>
 
                   {/* Priority */}
-                  <td className="px-6 py-4">
-                    <span
-                      className={`text-sm font-semibold capitalize ${getPriorityColor(
-                        project.priority
-                      )}`}
-                    >
-                      {getPriorityEmoji(project.priority)} {project.priority}
+                  <td className="px-5 py-3.5">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-300">
+                      <span className={`h-1.5 w-1.5 rounded-full ${priority.dot}`} />
+                      {priority.label}
                     </span>
                   </td>
 
-                  {/* Labels */}
-                  <td className="px-6 py-4">
-                    <div className="flex flex-wrap gap-1">
-                      {labelsArray.length > 0 ? (
-                        labelsArray.slice(0, 2).map((label, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex text-[10px] font-medium rounded-full bg-slate-100 px-2 py-1 text-slate-600"
-                          >
-                            {label}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-xs text-slate-400">No labels</span>
-                      )}
-                    </div>
+                  {/* Assignee */}
+                  <td className="px-5 py-3.5">
+                    {project.assignee ? (
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white ${avatarColor(
+                            project.assignee.username
+                          )}`}
+                        >
+                          {assigneeName.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-slate-800 dark:text-slate-200 truncate max-w-[120px]">
+                            {assigneeName}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-400 dark:text-slate-500">Unassigned</span>
+                    )}
                   </td>
 
                   {/* Due Date */}
-                  <td className="px-6 py-4">
-                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600">
+                  <td className="px-5 py-3.5">
+                    <span className="inline-flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
                       <Calendar className="h-3.5 w-3.5 text-slate-400" />
                       {formatDate(project.due_date)}
                     </span>
                   </td>
 
                   {/* Reporter */}
-                  <td className="px-6 py-4">
-                    <span className="text-xs font-medium text-slate-600">
-                      {project.reporter || "—"}
+                  <td className="px-5 py-3.5">
+                    <span className="text-xs text-slate-600 dark:text-slate-400">
+                      {project.reporter || project.creator?.full_name || "Manager"}
                     </span>
                   </td>
 
                   {/* Actions */}
-                  <td className="px-6 py-4">
-                    <div className="flex justify-end gap-1 opacity-70 transition group-hover:opacity-100">
-                      <button
-                        onClick={() => onEdit(project)}
-                        className="rounded-lg p-2 text-indigo-600 transition hover:bg-indigo-50"
-                        title="Edit project"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </button>
-
-                      <button
-                        onClick={() => onDelete(project.id)}
-                        className="rounded-lg p-2 text-red-500 transition hover:bg-red-50"
-                        title="Delete project"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                  <td className="px-5 py-3.5">
+                    <div className="flex justify-end gap-1">
+                      {isManager ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => onEdit(project)}
+                            aria-label="Edit project"
+                            title="Edit project"
+                            className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-indigo-600 dark:hover:bg-slate-800 dark:hover:text-indigo-400 transition-colors"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onDelete(project.id)}
+                            aria-label="Delete project"
+                            title="Delete project"
+                            className="rounded-md p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400 transition-colors"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onEdit(project)}
+                          className="rounded-md px-2.5 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 hover:bg-indigo-100 dark:hover:bg-indigo-950/60 transition-colors"
+                        >
+                          View
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -291,7 +285,7 @@ const ProjectTable = ({ projects, onDelete, onEdit, isLoading }) => {
           </tbody>
         </table>
       </div>
-    </section>
+    </Shell>
   );
 };
 

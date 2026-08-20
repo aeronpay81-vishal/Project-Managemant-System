@@ -49,9 +49,30 @@ def create_app():
     # Import models so SQLAlchemy creates all tables
     from app.models import User, Project, ProjectReport, Task  # noqa: F401
 
-    # Create database tables
+    # Create database tables and auto-migrate project_id column if needed
     with app.app_context():
         db.create_all()
+        try:
+            from sqlalchemy import text
+            with db.engine.connect() as conn:
+                # Check column for MySQL
+                try:
+                    res = conn.execute(text("SHOW COLUMNS FROM tasks LIKE 'project_id'"))
+                    if not res.fetchone():
+                        conn.execute(text("ALTER TABLE tasks ADD COLUMN project_id INT NULL, ADD INDEX idx_tasks_project_id (project_id)"))
+                        conn.commit()
+                except Exception:
+                    # SQLite fallback
+                    try:
+                        res = conn.execute(text("PRAGMA table_info(tasks)"))
+                        cols = [row[1] for row in res.fetchall()]
+                        if 'project_id' not in cols:
+                            conn.execute(text("ALTER TABLE tasks ADD COLUMN project_id INTEGER"))
+                            conn.commit()
+                    except Exception:
+                        pass
+        except Exception:
+            pass
     
     return app
 

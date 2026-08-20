@@ -82,3 +82,17 @@ def logout():
     response, status_code = AuthController.logout()
     return jsonify(response), status_code
 
+
+@auth_bp.route('/users', methods=['GET'])
+@jwt_required()
+def get_users():
+    """
+    Get all active users (supports ?role=user or ?role=manager)
+    
+    GET /api/auth/users
+    Headers: Authorization: Bearer <access_token>
+    """
+    response, status_code = AuthController.get_users()
+    return jsonify(response), status_code
+
+

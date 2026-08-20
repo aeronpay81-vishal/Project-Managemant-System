@@ -32,6 +32,13 @@ class ProjectController:
                     except:
                         data['labels'] = []
 
+                # Parse assignments if it's JSON string in form data
+                if 'assignments' in data and isinstance(data['assignments'], str):
+                    try:
+                        data['assignments'] = json.loads(data['assignments'])
+                    except:
+                        data['assignments'] = []
+
             if not data:
                 return {
                     'success': False,
@@ -113,6 +120,13 @@ class ProjectController:
                         data['labels'] = json.loads(data['labels'])
                     except:
                         data['labels'] = []
+
+                # Parse assignments if it's JSON string in form data
+                if 'assignments' in data and isinstance(data['assignments'], str):
+                    try:
+                        data['assignments'] = json.loads(data['assignments'])
+                    except:
+                        data['assignments'] = []
 
             if not data:
                 return {

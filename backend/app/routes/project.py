@@ -17,7 +17,7 @@ def get_projects():
 @project_bp.route('', methods=['POST'])
 @jwt_required()
 def create_project():
-    """Create a new project"""
+    
     current_user_id = get_current_user_id()
     return ProjectController.create_project(current_user_id)
 

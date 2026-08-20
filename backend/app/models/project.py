@@ -1,4 +1,3 @@
-
 from app import db
 from datetime import datetime
 
@@ -9,6 +8,7 @@ class Project(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    assigned_to = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)
     summary = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text, nullable=True)
     priority = db.Column(db.String(50), nullable=False, default='medium')
@@ -21,24 +21,56 @@ class Project(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    user = db.relationship('User', backref='projects')
+    user = db.relationship('User', foreign_keys=[user_id], backref='projects')
+    assignee = db.relationship('User', foreign_keys=[assigned_to], backref='projects_assigned')
     reports = db.relationship('ProjectReport', backref='project', cascade='all, delete-orphan')
 
     def to_dict(self):
+        task_list = [t.to_dict() for t in self.tasks] if hasattr(self, 'tasks') and self.tasks else []
         return {
             'id': self.id,
             'user_id': self.user_id,
+            'assigned_to': self.assigned_to,
+            'assignee': {
+                'id': self.assignee.id,
+                'username': self.assignee.username,
+                'full_name': self.assignee.full_name,
+                'email': self.assignee.email,
+                'role': self.assignee.role,
+            } if self.assignee else None,
+            'creator': {
+                'id': self.user.id,
+                'username': self.user.username,
+                'full_name': self.user.full_name,
+                'email': self.user.email,
+                'role': self.user.role,
+            } if self.user else None,
             'summary': self.summary,
             'description': self.description,
             'priority': self.priority,
             'status': self.status,
-            'labels': self.labels.split(',') if self.labels else [],
+            'labels': [l.strip() for l in self.labels.split(',') if l.strip()] if self.labels else [],
             'due_date': self.due_date.isoformat() if self.due_date else None,
             'start_date': self.start_date.isoformat() if self.start_date else None,
             'reporter': self.reporter,
             'attachment': self.attachment,
-            'created_at': self.created_at.isoformat(),
+            'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'tasks': task_list,
+            'assignments': [
+                {
+                    'id': t['id'],
+                    'assigned_to': t['assigned_to'],
+                    'priority': t['priority'],
+                    'status': t['status'],
+                    'start_date': t['start_date'],
+                    'due_date': t['due_date'],
+                    'task_detail': t.get('description') or t.get('summary'),
+                    'summary': t.get('summary'),
+                    'assignee': t.get('assignee'),
+                } for t in task_list
+            ] if task_list else [],
+            'task_count': len(task_list),
         }
 
 
@@ -65,6 +97,6 @@ class ProjectReport(db.Model):
             'file_name': self.file_name,
             'file_path': self.file_path,
             'file_size': self.file_size,
-            'created_at': self.created_at.isoformat(),
+            'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }

@@ -36,13 +36,14 @@ apiClient.interceptors.response.use(
 // ==================== Authentication API ====================
 
 export const authAPI = {
-  register: async (username, email, password, full_name) => {
+  register: async (username, email, password, full_name, role = 'user') => {
     try {
       const response = await apiClient.post('/auth/signup', {
         username,
         email,
         password,
         full_name,
+        role,
       })
       const data = response.data.data || response.data
 
@@ -83,7 +84,18 @@ export const authAPI = {
 
   getProfile: async () => {
     try {
-      const response = await apiClient.get('/auth/profile');
+      const response = await apiClient.get('/auth/me');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  getUsers: async (role = null) => {
+    try {
+      const params = {};
+      if (role) params.role = role;
+      const response = await apiClient.get('/auth/users', { params });
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
@@ -93,6 +105,17 @@ export const authAPI = {
   getStoredUser: () => {
     const user = localStorage.getItem('user');
     return user ? JSON.parse(user) : null;
+  },
+
+  getStoredRole: () => {
+    const user = localStorage.getItem('user');
+    if (!user) return 'user';
+    try {
+      const parsed = JSON.parse(user);
+      return parsed.role || 'user';
+    } catch {
+      return 'user';
+    }
   },
 
   isAuthenticated: () => {
